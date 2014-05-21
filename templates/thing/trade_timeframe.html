@@ -1,27 +1,26 @@
 {% extends "base.html" %}
-{% load thing_extras %}
 
 {% block title %}Trade: {{ timeframe }}{% endblock %}
 
-{% block extra_head %}
-<script type="text/javascript">
-$(document).ready(function() {
-  $("#trade-table").tablesorter({
-    'headers': {
-      2: { sorter: 'human' },
-      3: { sorter: 'human' },
-      4: { sorter: 'human' },
-      5: { sorter: 'human' },
-      6: { sorter: 'human' },
-      //7: { sorter: 'human' },
-      8: { sorter: 'human' },
-      9: { sorter: 'human' },
-      10: { sorter: 'human' },
-    },
-    'sortList': [[8, 1]],
-  });
-});
-</script>
+{% block extra_js %}
+    <script type="text/javascript">
+      $(document).ready(function() {
+        $("#trade-table").tablesorter({
+          'headers': {
+            2: { sorter: 'human' },
+            3: { sorter: 'human' },
+            4: { sorter: 'human' },
+            5: { sorter: 'human' },
+            6: { sorter: 'human' },
+            //7: { sorter: 'human' },
+            8: { sorter: 'human' },
+            9: { sorter: 'human' },
+            10: { sorter: 'human' },
+          },
+          'sortList': [[8, 1]],
+        });
+      });
+    </script>
 {% endblock %}
 
 {% block content %}
@@ -54,7 +53,7 @@ $(document).ready(function() {
             <tbody>
               {% for item in items -%}
               <tr class="r">
-                <td class="l"><a href="{{ 'thing.views.transactions_item'|url(item.pk, urlpart) }}">{{ item.name }}</a></td>
+                <td class="l">{#<a href="{{ 'thing.views.transactions_item'|url(item.pk, urlpart) }}">#}{{ item.name }}{#</a>#}</td>
                 <td class="l">{{ item.item_group.category.name }}</td>
                 <td>
                   <a href="#" title="Min: {{ item.t.buy_minimum|humanize }} | Avg: {{ item.t.buy_average|humanize }} | Max: {{ item.t.buy_maximum|humanize }}">
@@ -70,9 +69,9 @@ $(document).ready(function() {
                 <td>{{ item.t.sell_total|commas }}</td>
                 <td>{{ item.t.average_profit|commas }}</td>
                 <td>{{ item.t.average_profit_per }}%</td>
-                <td>{{ item.t.balance|commas|balance }}</td>
-                <td>{{ item.t.projected_average|commas|balance }}</td>
-                <td>{{ item.t.outstanding|commas|balance }}</td>
+                <td>{{ item.t.balance|commas|balance|safe }}</td>
+                <td>{{ item.t.projected_average|commas|balance|safe }}</td>
+                <td>{{ item.t.outstanding|commas|balance|safe }}</td>
               </tr>
               {% else %}
               <tr>

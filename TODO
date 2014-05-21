@@ -1,119 +1,96 @@
-* API Keys:
-  - Display "data for this key has not yet been pulled" instead of just NONE NONE NONE
-  - Explain how API data is pulled
-  - Some way to see last pull/next pull time for keys
-  - Warn when a key doesn't have the required mask to pull AccountStatus (game time warnings)
-
-* Account Management:
-  - Move Event Log to this page
-  - Add a way to create Campaigns
-
-* Assets:
-  - Add a volume column
-  - Improve search features:
-    = Types:
-      # Value
-      # Total value
-      # Containers only toggle?
-      # Item group
-      # Station name
-      # System name
-    = Magical JS buttons to add/remove extra search filters
-  - Work out why the initial Asset view query is so slow, 1300 rows shouldn't take half a second. Possibly
-    related to the pile of horrible LEFT OUTER JOINs, try querying (items, characters, etc) separately.
-
-* Blueprints:
-  - Work out a way to be able to say "I want to make 100 Blackbirds and 300 rigs to go on them" and get a BPCalc
-    summary page out of it.
-  - Profitability dumping to buys instead of using sells?
-
-* Character Sheet:
-  - Make categories expandable/collapsible
-  - Expand all/collapse all JavaScript links
-  - Standings tab needs agent standings
-  - Ability to see a post-plan character sheet?
-  - Add employment history
-  - Skill tooltips should move to their own icon
-  - Skill tooltips should show Primary/Secondary attributes
-    = Possibly need to change how tooltips are created?
-
-* Contracts:
-  - Work out how in the hell to track them for Trade
-  - Summary table similar to orders
-  - Make a proper __unicode__ method
-    = Courier types return "#id (type, start_station -> end_station)"
-    = Other types return "#id (type, start_station)"
-
-* Home:
-  - Fix several mobile browser bugs:
-    = The body: padding-top CSS is not required on Android default browser at the very least
-    = Navbar links disappear on Android default browser
-    = Home page does not do responsive things with themes (slate at least)
-  - Add an option to hide corp wallet/event log sections
-
-* Market Scan:
-  - Add different scan types (assets+blueprints takes forever):
-    = Assets
-    = Blueprints
-    = [All]
-
-* Skill Plans
-  - Display partial times for partial skills (including training)
-  - Implement skill plan creation (hahahaha oh god)
-    = Skill model needs to track pre-requisites
-    = Use AJAX and modal windows for add/delete/re-order?
-    = Step 1: basic adding of skills with pre-requisites
-    = Step 2: deletion of skills with pre-requisites and a useful "are you sure?" prompt
-    = Step 3: re-ordering of entries
-      # Basic updating - if you move position 32 to position 2, you can update that in two queries:
-        % UPDATE thing_entry SET position = position + 1 WHERE skillplan_id = n AND (position >= 2 AND position <= 1)
-        % UPDATE thing_entry SET position = 2 WHERE id = n
-      # Complex updating - deal with pre-requisites, urgh
-
-* Trade:
-  - Add contract sums to the overview page
-  - Investigate consolidating the query mess into less queries
-
-* Transactions:
-  - Ability to search transactions via:
-    = character
-    = partial item name
-    = date (before x, after x, between x and y)
-    = wallets?
-    = client
-  - Clickable Client column to filter further
-
-* Wallet journal:
-  - Implement database model to store
-  - ISK per hour graph for mission rewards/rat bounties/etc
-  - Corporation graph too?
-
-* api_updater:
-  - Make SystemEvent objects for admin-related events
-  - Wallet Journal char/corp support
-  - Convert everything over to using Django 1.4 bulk saves
-    = Standings, WalletTransactions done
-
 * documentation:
   - Pages need to explain what the hell they do
-  - Celery:
-    = python manage.py celery worker -B -E -l info -Q et_medium,et_low -c 4
-    = python manage.py celery worker -E -l info -Q et_high,et_medium -c 1
+    = Help link somewhere?
+  - http://www.readthedocs.org/
+  - Build a page for evething.org
+  -- Some sort of exciting exploration of features I guess!
 
-* misc:
-  - Get some less awful themes, oh dear
+* features:
+  - Industry jobs:
+    = Events for job installation/completion/etc
+    = Some sort of success rate tracker for invention?
+  - Wallet journal:
+    = ISK per hour graph for mission rewards/rat bounties/etc
+    = Corporation graph too?
   - Email warnings
     = Let user configure email address (save to auth_user email field?)
       # Implement email verification because people are idiots
     = Configurable:
       # Frequency (once, hourly, daily)
-        % Will need a new database model to store events that have been issued
+        % Will need another damn new database model to store events that have been issued
       # Things to email about (insufficient clone, room in skill queue, account not in training, account time <10 days)
-  - Implement proper APIKey access_mask checks
+  - Notifications
+    = Does anyone actually care about notifications?
+
+* misc:
+  - Implement proper APIKey access_mask checks:
     = User A has a full (all masks) key for account 'example'
-    = User B has a minimal (say, basic character infon only) key for account 'example'
+    = User B has a minimal (say, basic character info only) key for account 'example'
     = User B can actually see all data related to this account, even though their APIKey.access_mask is much more limited
     = Will require modifying all view code to use .extra() and a binary AND on the access_mask field, ugh
+      # apikey.get_masks() and comparing the list to apikey.foo_MASK maybe? Possibly slow.
 
-* price_updater:
-  - Add support for other sources of market data
+* skill plans:
+  - Implement skill plan creation (hahahaha oh god)
+    = Use AJAX and modal windows for add/delete/re-order?
+    = Step 1: basic adding of skills with pre-requisites
+    = Step 2: deletion of skills and a useful "are you sure?" prompt if other skills depend on it
+    = Step 3: re-ordering of entries (complete with moving pre-reqs)
+
+* tasks:
+  - Make SystemEvent objects for admin-related events
+  - Do something about fixing the godawful mess where adding a task requires editing multiple places.
+    Maybe move task settings (queue, required mask, URL) to class variables and hack together some
+    sort of Celery task autodiscover? I'm sure it's possible :v
+
+* tasks.industryjobs:
+  - SIGH. Work out what in the hell is going on here.
+
+* tasks.price_updater:
+  - Add support for other sources of market data (EVE-Central, EVEMarketData?)
+
+* tests:
+  - Check that all page views return a correct OK/KABOOM response.
+  - Check that database modification views (account, blueprints, etc) do what they should.
+  - Check model calculations (skill completion, blueprint calculations, etc).
+
+* views.account:
+  - Move Event Log to this page
+  - Add a way to create Campaign objects
+  - API Keys:
+    = Warn when a key doesn't have the required mask to pull AccountStatus (game time warnings)
+    = Display "data for this key has not yet been pulled" instead of just NONE NONE NONE
+    = Explain how API data is pulled
+    = Some way to see last pull/next pull time for each API call related to a key
+
+* views.assets:
+  - Filter by unit price, < = > comparisons.
+  - Change the default query type from exact match to contains.
+  - Add a fourth query type which is does not contain.
+  - Add the ability to query only personal assets, corp assets or both.
+  - Add summary by region and filter by region.
+
+* views.blueprints:
+  - Work out a sane way to be able to say "I want to make 100 Blackbirds and 300 rigs to go on them" and get
+    a BPCalc summary page out of it.
+  - Profitability dumping to buys instead of using sells?
+
+* views.character:
+  - Make categories expandable/collapsible
+  - Expand all/collapse all JavaScript links
+  - Standings tab needs agent standings
+  - Ability to see a post-skill-plan character sheet?
+  - Add employment history
+  - Skill tooltips:
+    = Should display training time for each further level
+
+* views.character_skillplan:
+  - When visiting a skill plan with a character, it seems the remaining time does not take into account the sp
+    already spent on this skill, unless it's currently training.
+
+* views.contracts:
+  - Summary table similar to orders
+
+* views.home:
+  - Add options to hide corp wallet/event log sections
+  - Add options to ignore specific notifications for specific characters.

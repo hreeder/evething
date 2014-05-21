@@ -1,389 +1,298 @@
 {% extends "base.html" %}
-{% load thing_extras %}
+{% import 'macros/common.html' as common %}
 
 {% block title %}{% if anonymous %}Anonymized Character: {{ char.config.anon_key }}{% else %}Character: {{ char.name }}{% endif %}{% endblock %}
 
-{% block extra_head %}
-  <script type="text/javascript">
-    {% if not anonymous -%}
-    var anon_checked = null;
-    {%- endif %}
-
-    $(document).ready(function() {
-      {% if not anonymous -%}
-      $("#public-checkbox").change(settings_checkboxes);
-      settings_checkboxes();
-      
-      anon_checked = $('#anon-key').attr('checked');
-      $("#anon-key").change(anon_toggle);
-      anon_toggle();
-      {%- endif %}
-      
-      // hover thing for skill descriptions
-      $('span[rel="popover"]').popover({ animation: false });
-
-      // Javascript to enable link to tab
-      var prefix = 'tab_';
-      var hash = document.location.hash;
-      if (hash) {
-        $('.nav-tabs a[href=' + hash.replace(prefix, "") + ']').tab('show');
-      }
-      
-      // Change hash for page-reload
-      $('.nav-tabs a').on('shown', function (e) {
-        window.location.hash = e.target.hash.replace('#', '#' + prefix);
-      })
+{% block extra_js %}
+    <script type="text/javascript">$(document).ready(function() {
+      EVEthing.character.anon_url = "{{ url('thing.views.character_anonymous', 'zzzz') }}";
+      EVEthing.character.onload();
     });
-
-    {% if not anonymous -%}
-    function settings_checkboxes() {
-      var state = $("#public-checkbox").attr("checked");
-      if (state == "checked") { $("input.disable-toggle").removeAttr("disabled"); }
-      else { $("input.disable-toggle").attr("disabled", ""); }
-    }
-
-    function anon_toggle() {
-      var checked = $('#anon-key').attr('checked');
-      if (checked != anon_checked) {
-        $('#anon-key-link').remove();
-        anon_checked = checked;
-      }
-
-      if (checked == "checked") {
-        $("#anon-key-text").removeAttr("disabled");
-        if ($("#anon-key-text").val() == "") {
-          $("#anon-key-text").val(randString(16));
-        }
-      }
-      else {
-        $("#anon-key-text").attr("disabled", "");
-        $("#anon-key-text").val("");
-      }
-    }
-    {%- endif %}
-  </script>
+    </script>
 {% endblock %}
 
 {% block content %}
-      <div class="row">
-        <div class="span3">
-          <div class="thumbnail">
-            {% if anonymous -%}
-            <img src="{{ STATIC_URL }}img/anonymous_character.jpg">
-            {%- else %}
-            <img src="http://image.eveonline.com/Character/{{ char.id }}_256.jpg">
-            {%- endif %}
-          </div>
-          
-          {%- if not public %}
-          <br>
-          <div class="well">
-            <h3>Settings</h3>
-            <form action="{% url thing.views.character_settings char.name %}" method="POST" style="margin: 0">
-              {% csrf_token %}
-              <input type="hidden" name="character_id" value="{{ char.id }}">
-              <label class="checkbox">
-                <input type="checkbox" id="public-checkbox" name="public"{% if char.config.is_public %} checked{% endif %}>
-                Publicly visible
-                <div class="pull-right">
-                  <i class="icons-information" rel="tooltip" title="Whether or not this character sheet is publicly accessible"></i>
-                </div>
-              </label>
-              <label class="checkbox indent">
-                <input type="checkbox" class="disable-toggle" name="clone"{% if char.config.show_clone %} checked{% endif %}>
-                Clone information
-                <div class="pull-right">
-                  <i class="icons-information" rel="tooltip" title="Show clone information on public sheet"></i>
-                </div>
-              </label>
-              <label class="checkbox indent">
-                <input type="checkbox" class="disable-toggle" name="implants"{% if char.config.show_implants %} checked{% endif %}>
-                Implants
-                <div class="pull-right">
-                  <i class="icons-information" rel="tooltip" title="Show implant information on public sheet"></i>
-                </div>
-              </label>
-              <label class="checkbox indent">
-                <input type="checkbox" class="disable-toggle" name="queue"{% if char.config.show_skill_queue %} checked{% endif %}>
-                Skill queue
-                <div class="pull-right">
-                  <i class="icons-information" rel="tooltip" title="Show skill queue on public sheet"></i>
-                </div>
-              </label>
-              <label class="checkbox indent">
-                <input type="checkbox" class="disable-toggle" name="standings"{% if char.config.show_standings %} checked{% endif %}>
-                Standings
-                <div class="pull-right">
-                  <i class="icons-information" rel="tooltip" title="Show faction/corporation standings on public sheet"></i>
-                </div>
-              </label>
-              <label class="checkbox indent">
-                <input type="checkbox" class="disable-toggle" name="wallet"{% if char.config.show_wallet %} checked{% endif %}>
-                Wallet balance
-                <div class="pull-right">
-                  <i class="icons-information" rel="tooltip" title="Show wallet balance on public sheet"></i>
-                </div>
-              </label>
-              <br>
-              <label class="checkbox">
-                <input type="checkbox" id="anon-key" name="anon-key-toggle"{% if char.config.anon_key %} checked{% endif %}>
-                Anonymous key
-                <div class="pull-right">
-                  <i class="icons-information" rel="tooltip" title="Key to use for anonymous character sheet"></i>
-                </div>
-              </label>
-              <label class="indent">
-                <input type="text" id="anon-key-text" name="anon-key" maxlength="16" value="{{ char.config.anon_key }}" class="input-medium">
-                {% if char.config.anon_key %}<a id="anon-key-link" href="{% url thing.views.character_anonymous char.config.anon_key %}">Anonymized link</a>{% endif %}
-              </label>
-              <button type="submit" class="btn btn-primary">Save</button>
-            </form>
-          </div>
-          {%- endif %}
-          
-          {% if user_plans or public_plans -%}
-          {% with user.is_authenticated() as authed -%}
-          {% if public -%}
-          <br>
-          {%- endif %}
-          <div class="well">
-            {% if not anonymous and user_plans -%}
-            <h4>My Skill Plans</h4>
-            <ul class="unstyled">
-              {% for sp in user_plans -%}
-              <li>
-                <i class="icons-visibility-{{ sp.z_icon }}"></i>
-                <a href="{{ 'thing.views.character_skillplan'|url(char.name, sp.id) }}">{{ sp.name }}</a>
-              </li>
-              {%- endfor %}
-            </ul>
-            {%- endif %}
-            {% if public_plans -%}
-            <h4>Global Skill Plans</h4>
-            <ul class="unstyled">
-              {% for sp in public_plans -%}
-              <li>
-                <i class="icons-visibility-{{ sp.z_icon }}"></i>
-                {% if anonymous -%}
-                <a href="{{ 'thing.views.character_anonymous_skillplan'|url(char.config.anon_key, sp.id) }}">
-                {%- else -%}
-                <a href="{{ 'thing.views.character_skillplan'|url(char.name, sp.id) }}">
+      <div class="row-fluid character-main">
+        <div class="character-content">
+          <div class="span12">
+            <h2 class="nomargin">{% if anonymous %}Anonymized: {{ char.config.anon_key }}{% else %}{{ char.name }}{% endif %}</h2>
+            <div class="row-fluid">
+              <div class="span4">
+                {% if not anonymous -%}
+                <ul class="unstyled">
+                  <li><strong>Corporation:</strong> {{ char.corporation.name }}</li>
+                  {% if char.corporation.alliance -%}
+                  <li><strong>Alliance:</strong> {{ char.corporation.alliance.name }}</li>
+                  {%- endif %}
+                </ul>
                 {%- endif %}
-                  {% if authed -%}
-                  [{{ sp.user.username }}]
+                {% if show.wallet %}<p><strong>Wallet:</strong> {{ char.details.wallet_balance|commas }} ISK</p>{% endif %}
+                <ul class="unstyled">
+                  <li><strong>Total SP:</strong> {{ total_sp|commas }}</li>
+                  {% if show.clone -%}
+                  <li><strong>Clone limit:</strong> {{ char.details.clone_skill_points|commas }} ({{ char.get_short_clone_name() }})</li>
                   {%- endif %}
-                  {{ sp.name }}
-                </a>
-              </li>
-              {%- endfor %}
-            </ul>
-            {%- endif %}
-          </div>
-          {%- endwith %}
-          {%- endif %}
-        </div>
-        
-        <div class="span9">
-          <h2>
-            {% if anonymous -%}
-            {{ char.config.anon_key }}
-            {%- else %}
-            {{ char.name }}
-            {%- endif %}
-          </h2>
-          <div class="row">
-            <div class="span7">
-              <div class="row">
-                <div class="span4">
-                  {% if not anonymous -%}
-                  <p><strong>Corp:</strong> {{ char.corporation.name }}</p>
-                  {%- endif %}
-                  {% if not anonymous and (not public or char.config.show_wallet) -%}
-                  <p><strong>Wallet:</strong> {{ char.wallet_balance|commas }} ISK</p>
-                  {%- endif %}
-                  <ul class="unstyled">
-                    <li><strong>Total SP:</strong> {{ char.get_total_skill_points()|commas }}</li>
-                    {% if not anonymous and (not public or char.config.show_clone) -%}
-                    <li><strong>Clone limit:</strong> {{ char.clone_skill_points|commas }} ({{ char.get_short_clone_name() }})</li>
-                    {%- endif %}
-                  </ul>
-                </div>
-                <div class="span3 pull-right">
-                  <table>
-                    <tr class="r">
-                      <td><strong>Int:</strong></td>
-                      <td>{{ char.int_attribute }}</td>
-                      <td>
-                        {% if not anonymous and (not public or char.config.show_implants) -%}
-                        (+{{ char.int_bonus }})
-                        {%- else -%}
-                        (??)
-                        {%- endif %}
-                      </td>
-                    </tr>
-                    <tr class="r">
-                      <td><strong>Mem:</strong></td>
-                      <td>{{ char.mem_attribute }}</td>
-                      <td>
-                        {% if not anonymous and (not public or char.config.show_implants) -%}
-                        (+{{ char.mem_bonus }})
-                        {%- else -%}
-                        (??)
-                        {%- endif %}
-                      </td>
-                    </tr>
-                    <tr class="r">
-                      <td><strong>Per:</strong></td>
-                      <td>{{ char.per_attribute }}</td>
-                      <td>
-                        {% if not anonymous and (not public or char.config.show_implants) -%}
-                        (+{{ char.per_bonus }})
-                        {%- else -%}
-                        (??)
-                        {%- endif %}
-                      </td>
-                    </tr>
-                    <tr class="r">
-                      <td><strong>Wil:</strong></td>
-                      <td>{{ char.wil_attribute }}</td>
-                      <td>
-                        {% if not anonymous and (not public or char.config.show_implants) -%}
-                        (+{{ char.wil_bonus }})
-                        {%- else -%}
-                        (??)
-                        {%- endif %}
-                      </td>
-                    </tr>
-                    <tr class="r">
-                      <td><strong>Cha:</strong></td>
-                      <td>{{ char.cha_attribute }}</td>
-                      <td>
-                        {% if not anonymous and (not public or char.config.show_implants) -%}
-                        (+{{ char.cha_bonus }})
-                        {%- else -%}
-                        (??)
-                        {%- endif %}
-                      </td>
-                    </tr>
-                  </table>
-                  <br>
-                </div>
+                </ul>
+              </div>
+              <div class="span8 pull-right">
+                <table>
+                  <tr class="r">
+                    <td><strong>Int:</strong></td>
+                    <td>{{ char.details.int_attribute }}</td>
+                    <td>({% if show.implants %}+{{ char.details.int_bonus }}{% else %}??{% endif %})</td>
+                  </tr>
+                  <tr class="r">
+                    <td><strong>Mem:</strong></td>
+                    <td>{{ char.details.mem_attribute }}</td>
+                    <td>({% if show.implants %}+{{ char.details.mem_bonus }}{% else %}??{% endif %})</td>
+                  </tr>
+                  <tr class="r">
+                    <td><strong>Per:</strong></td>
+                    <td>{{ char.details.per_attribute }}</td>
+                    <td>({% if show.implants %}+{{ char.details.per_bonus }}{% else %}??{% endif %})</td>
+                  </tr>
+                  <tr class="r">
+                    <td><strong>Wil:</strong></td>
+                    <td>{{ char.details.wil_attribute }}</td>
+                    <td>({% if show.implants %}+{{ char.details.wil_bonus }}{% else %}??{% endif %})</td>
+                  </tr>
+                  <tr class="r">
+                    <td><strong>Cha:</strong></td>
+                    <td>{{ char.details.cha_attribute }}</td>
+                    <td>({% if show.implants %}+{{ char.details.cha_bonus }}{% else %}??{% endif %})</td>
+                  </tr>
+                </table>
+                <br>
               </div>
             </div>
-          </div>
 
-          {% if queue and (anonymous or not public or char.config.show_skill_queue) -%}
-          <div class="row">
-            <div class="span9">
-              <div class="well well-small {% if queue_duration < 86400 %}alert-error{% else %}alert-success{% endif %}">
-                <h3>Skill Queue</h3>
+            {% if show.queue and queue -%}
+            <div class="row-fluid">
+              <div class="span12 well well-small alert {% if queue_duration < 86400 %}alert-error{% else %}alert-success{% endif %}">
+                <h3 class="nomargin">Skill Queue</h3>
                 <div>
                   {{ queue.0.skill.item.name }} {{ queue.0.get_roman_level() }} (Rank {{ queue.0.skill.rank }}) --
                   {{ queue.0.get_remaining()|duration }} remaining
-                  <div class="pull-right">{{ queue.0.end_time|date("Y-m-d H:i:s") }} UTC</div>
+                  <div class="pull-right">{{ queue.0.end_time }} UTC</div>
                   <div style="width: 100%">
                     <div class="progress progress-striped{% if queue_duration < 86400 %} progress-danger{% endif%} margin-half-top">
-                      <div class="bar" style="width: {{ queue.0.get_complete_percentage() }}%">{{ queue.0.get_complete_percentage() }}%</div>
+                      <div class="bar" style="width: {{ queue.0.z_complete }}%">{{ queue.0.z_complete }}%</div>
                     </div>
                   </div>
                 </div>
-                {% if queue_rest %}
+                {% if queue|count > 1 %}
                 <div class="margin-half-top">
-                  {% for sq in queue_rest %}
+                  {% for sq in queue[1:] %}
                   <div>
                     {{ sq.skill.item.name }} {{ sq.get_roman_level() }} (Rank {{ sq.skill.rank }})
-                    <div class="pull-right">{{ sq.end_time|date("Y-m-d H:i:s") }} UTC</div>
+                    <div class="pull-right">{{ sq.end_time }} UTC</div>
                   </div>
                   {% endfor %}
                 </div>
                 {% endif %}
               </div>
             </div>
-          </div>
-          {%- endif %}
-
-          <ul class="nav nav-tabs" id="tabs">
-            <li class="active"><a href="#skills" data-toggle="tab">Skills</a></li>
-            {% if not anonymous and (not public or char.config.show_standings) -%}
-            <li><a href="#standings" data-toggle="tab">Standings</a></li>
             {%- endif %}
-          </ul>
 
-          <div class="tab-content">
-            <div class="tab-pane active" id="skills">
-              {% for mg, css in skills.items() %}
-              <div class="row">
-                <div class="span9">
-                  <div class="well well-small">
-                    <div class="char-skill-box">
-                      <span class="char-skill-group">{{ mg.name }}</span>
-                      --
-                      <strong>{{ css|length }}</strong> skill{{ css|length|pluralize }} trained for <strong>{{ mg.z_total_sp|commas }}</strong> SP
-                    </div>
-                    {% for cs in css %}
-                    <div class="clearfix">
-                      {%- if cs.z_training %}<i class="icons-skill-training"></i>{% endif %}
-                      <span href="#" class="skill-hover{% if cs.z_class %} {{ cs.z_class }}{% endif %}" rel="popover" title="{{ cs.skill.item.name }}" data-content="{{ cs.skill.description }}">
-                        {{ cs.skill.item.name }} {{ cs.get_roman_level() }}
-                      </span>
-                      
-                      <div class="pull-right">
-                        {%- for icon in cs.z_icons %}
-                        <i class="icons-skill-{{ icon }} skill"></i>
-                        {%- endfor -%}
-                      </div>
+            <ul class="nav nav-tabs" id="tabs">
+              <li class="active"><a href="#tab_skills" data-toggle="tab">Skills</a></li>
+              {% if show.standings %}<li><a href="#tab_standings" data-toggle="tab">Standings</a></li>{% endif %}
+            </ul>
 
-                      <div class="pull-right character-sp">{{ cs.skill.get_sp_at_level()|commas }} SP</div>
-                      <div class="pull-right character-sp">{{ cs.points|commas }} / </div>
-                      <div class="pull-right character-sp small">Rank {{ cs.skill.rank }}</div>
-                    </div>
-                    {% endfor %}
-                  </div>
-                </div>
+            <div class="tab-content">
+              <div class="tab-pane active" id="tab_skills">
+                <div class="anchor" id="skills-top"></div>
+                {% for mg, css in skills.items() -%}
+                <div class="anchor" id="{{ mg.slug() }}"></div>
+                <span class="char-skill-group">{{ mg.name }}</span>
+                --
+                <strong>{{ css|length }}</strong> skill(s) trained for <strong>{{ mg.z_total_sp|commas }}</strong> SP
+                <table class="table table-striped table-condensed table-hover">
+                  {% for cs in css -%}
+                  <tr>
+                    <td>
+                      {%- if cs.z_training %}<i class="icon-flag {{ cs.z_class }}"></i>{% endif %}
+                      {{ common.skill_hover(cs.skill, cs.level, cs.z_class) }}
+                    </td>
+                    <td class="skill-rank">Rank {{ cs.skill.rank }}</td>
+                    <td class="skill-sp">{{ cs.points|commas }} /</td>
+                    <td class="skill-sp">{{ cs.skill.get_sp_at_level()|commas }} SP</td>
+                    <td class="skill-icons">
+                      {% for icon in cs.z_icons -%}
+                      <i class="icon-{{ icon }}"></i>
+                      {%- endfor %}
+                    </td>
+                  </tr>
+                  {%- endfor %}
+                </table>
+                {%- endfor %}
               </div>
-              {% endfor %}
-            </div>
 
-            {% if not anonymous and (not public or char.config.show_standings) %}
-            <div class="tab-pane" id="standings">
-              <table class="table table-striped table-bordered table-condensed">
-                <thead>
-                  <tr>
-                    <th colspan="2" class="large">Factions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for fs in char.factionstanding_set.select_related().all() %}
-                  <tr>
-                    <td>{{ fs.faction.name }}</td>
-                    <td class="r">{{ fs.standing }}</td>
-                  </tr>
-                  {% else %}
-                  <tr><td colspan="2">No standings.</td></tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-              <table class="table table-striped table-bordered table-condensed">
-                <thead>
-                  <tr>
-                    <th colspan="2" class="large">Corporations</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for cs in char.corporationstanding_set.select_related().all() %}
-                  <tr>
-                    <td>{{ cs.corporation.name }}</td>
-                    <td class="r">{{ cs.standing }}</td>
-                  </tr>
-                  {% else %}
-                  <tr><td colspan="2">No standings.</td></tr>
-                  {% endfor %}
-                </tbody>
-              </table>
+              {% if show.standings %}
+              <div class="tab-pane" id="tab_standings">
+                <table class="table table-striped table-condensed table-hover">
+                  <thead>
+                    <tr>
+                      <th colspan="2" class="large">Factions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for fs in faction_standings %}
+                    <tr>
+                      <td>{{ fs.faction.name }}</td>
+                      <td class="r">{{ fs.standing }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="2">No standings.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                <table class="table table-striped table-condensed table-hover">
+                  <thead>
+                    <tr>
+                      <th colspan="2" class="large">Corporations</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for cs in corp_standings %}
+                    <tr>
+                      <td>{{ cs.corporation.name }}</td>
+                      <td class="r">{{ cs.standing }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="2">No standings.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% endif %}
             </div>
-            {% endif %}
           </div>
         </div>
       </div>
+
+      <div class="character-side">
+{% if anonymous %}
+{% set img = STATIC_URL + 'img/anonymous_character.jpg' %}
+{% else %}
+{% set img = 'http://image.eveonline.com/Character/%s_256.jpg' % (char.id) %}
+{% endif %}
+        <div class="image character-image" style="background-image: url('{{ img }}');">
+          <i id="skillplans-toggle" class="icon-list icon-2x clickable" rel="tooltip" title="Toggle skillplans"></i>
+{% if not public %}
+          <i id="settings-toggle" class="icon-cog icon-2x clickable" rel="tooltip" title="Toggle settings"></i>
+{% endif %}
+        </div>
+
+        {%- if not public %}
+        <div id="settings-box" class="well well-small hidey-box" style="display: none;">
+          <h4 class="nomargin">Settings</h4>
+          <form id="settings-form" action="{{ url('thing.views.character_settings', char.name) }}" method="POST" style="margin: 0">
+            {{ csrf() }}
+            <input type="hidden" name="character_id" value="{{ char.id }}">
+            <label class="checkbox">
+              <input type="checkbox" id="public-checkbox" name="public"{% if char.config.is_public %} checked{% endif %}>
+              Publicly visible
+              <div class="pull-right">
+                <i class="icon-info-sign" rel="tooltip" title="Whether or not this character sheet is publicly accessible"></i>
+              </div>
+            </label>
+            <label class="checkbox indent">
+              <input type="checkbox" class="disable-toggle" name="clone"{% if char.config.show_clone %} checked{% endif %}>
+              Clone information
+              <div class="pull-right">
+                <i class="icon-info-sign" rel="tooltip" title="Show clone information on public sheet"></i>
+              </div>
+            </label>
+            <label class="checkbox indent">
+              <input type="checkbox" class="disable-toggle" name="implants"{% if char.config.show_implants %} checked{% endif %}>
+              Implants
+              <div class="pull-right">
+                <i class="icon-info-sign" rel="tooltip" title="Show implant information on public sheet"></i>
+              </div>
+            </label>
+            <label class="checkbox indent">
+              <input type="checkbox" class="disable-toggle" name="queue"{% if char.config.show_skill_queue %} checked{% endif %}>
+              Skill queue
+              <div class="pull-right">
+                <i class="icon-info-sign" rel="tooltip" title="Show skill queue on public sheet"></i>
+              </div>
+            </label>
+            <label class="checkbox indent">
+              <input type="checkbox" class="disable-toggle" name="standings"{% if char.config.show_standings %} checked{% endif %}>
+              Standings
+              <div class="pull-right">
+                <i class="icon-info-sign" rel="tooltip" title="Show faction/corporation standings on public sheet"></i>
+              </div>
+            </label>
+            <label class="checkbox indent">
+              <input type="checkbox" class="disable-toggle" name="wallet"{% if char.config.show_wallet %} checked{% endif %}>
+              Wallet balance
+              <div class="pull-right">
+                <i class="icon-info-sign" rel="tooltip" title="Show wallet balance on public sheet"></i>
+              </div>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" id="anon-toggle" name="anon-key-toggle"{% if char.config.anon_key %} checked{% endif %}>
+              Anonymous key
+              <div class="pull-right">
+                <i class="icon-info-sign" rel="tooltip" title="Key to use for anonymous character sheet"></i>
+              </div>
+            </label>
+            <input type="hidden" id="anon-key" value="{{ char.config.anon_key }}">
+            <label class="indent" id="anon-key-label">
+            </label>
+            <button type="submit" class="btn btn-primary">Save settings</button>
+            <span id="settings-status" class="pull-right"></span>
+          </form>
+        </div>
+        {%- endif %}
+
+        {% if user_plans -%}
+        <div id="skillplans-personal" class="well well-small hidey-box" style="display: none;">
+          <h4 class="nomargin">My Skill Plans</h4>
+          <ul class="unstyled">
+            {% for sp in user_plans -%}
+            <li>
+              <i class="icon-{{ sp.z_icon }}"></i>
+              <a href="{{ url('thing.views.character_skillplan', char.name, sp.id) }}">{{ sp.name }}</a>
+            </li>
+            {%- endfor %}
+          </ul>
+        </div>
+        {%- endif %}
+
+        {% if public_plans -%}
+        {% set authed = user.is_authenticated() -%}
+        <div id="skillplans-global" class="well well-small hidey-box" style="display: none;">
+          <h4 class="nomargin">Global Skill Plans</h4>
+          <ul class="unstyled">
+            {% for sp in public_plans -%}
+            <li>
+              <i class="icon-{{ sp.z_icon }}"></i>
+              {% if anonymous -%}
+              <a href="{{ url('thing.views.character_anonymous_skillplan', char.config.anon_key, sp.id) }}">
+              {%- else -%}
+              <a href="{{ url('thing.views.character_skillplan', char.name, sp.id) }}">
+              {%- endif %}
+                {{ sp.name }}{% if authed %} [{{ sp.user.username }}]{% endif %}
+              </a>
+            </li>
+            {%- endfor %}
+          </ul>
+        </div>
+        {%- endif %}
+
+        <div id="sidenav-offset"></div>
+        <div>
+          <ul id="sidenav" class="nav nav-list character-sidenav">
+{% for mg, css in skills.items() -%}
+            <li><a href="#{{ mg.slug() }}"><i class="icon-chevron-right"></i> {{ mg.name }}</a></li>
+{% endfor %}
+          </ul>
+        </div>
+      </div>
+
+      <div class="clearfix"></div>
 
 {% endblock %}

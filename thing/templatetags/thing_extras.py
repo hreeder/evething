@@ -115,6 +115,13 @@ def balance(s):
     else:
         return mark_safe('<span class="pos">%s</span>' % (s))
 
+@register.filter
+def balance_class(n):
+    if n < 0:
+        return 'neg'
+    else:
+        return 'pos'
+
 # Conditionally wrap some text in a span if it matches a condition. Ugh.
 @register.filter
 def spanif(value, arg):
@@ -148,6 +155,18 @@ def tablecols(data, cols):
     return rows
 
 
+roman_list = ['', 'I', 'II', 'III', 'IV', 'V']
+
 @register.filter
-def roman(s):
-    return ['', 'I', 'II', 'III', 'IV', 'V'][int(s)]
+def roman(num):
+    if isinstance(num, str) or isinstance(num, unicode):
+        return roman_list[int(num)]
+    elif isinstance(num, int) or isinstance(num, long):
+        return roman_list[num]
+    else:
+        return ''
+
+MONTHS = [None, 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+@register.filter
+def month_name(num):
+    return MONTHS[num]

@@ -1,3 +1,9 @@
 *.db
 *.pyc
+*.sublime-project
+*.sublime-workspace
 local_settings.py
+skill_map.pickle
+thing/profile_middleware.py
+.*.swp
+node_modules/

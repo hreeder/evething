@@ -3,12 +3,6 @@
 import os
 _PATH = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 
-# admins, obviously
-ADMINS = (
-    ('Freddie', 'freddie@wafflemonster.org'),
-)
-MANAGERS = ADMINS
-
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
 # although not all choices may be available on all operating systems.
@@ -45,7 +39,7 @@ MEDIA_URL = ''
 # Don't put anything in this directory yourself; store your static files
 # in apps' "static/" subdirectories and in STATICFILES_DIRS.
 # Example: "/home/media/media.lawrence.com/static/"
-STATIC_ROOT = os.path.join(_PATH, 'static')
+STATIC_ROOT = os.path.join(_PATH, 'tempstatic')
 
 # URL prefix for static files.
 # Example: "http://media.lawrence.com/static/"
@@ -61,7 +55,7 @@ STATICFILES_DIRS = (
     # Put strings here, like "/home/html/static" or "C:/www/django/static".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
-    os.path.join(_PATH, 'base_static'),
+    os.path.join(_PATH, 'static'),
 )
 
 # List of finder classes that know how to find static files in
@@ -77,9 +71,10 @@ SECRET_KEY = ')%)w42n83ndwvlrnj99-77@e0)(kcs!$zd%#pcy0&e5x0kwq01'
 
 # List of callables that know how to import templates from various sources.
 TEMPLATE_LOADERS = (
+    'jingo.Loader',
     'django.template.loaders.filesystem.Loader',
     'django.template.loaders.app_directories.Loader',
-#    'django.template.loaders.eggs.Loader',
+    # 'django.template.loaders.eggs.Loader',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -88,6 +83,7 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'thing.middleware.LastSeenMiddleware',
 )
 
 ROOT_URLCONF = 'evething.urls'
@@ -111,6 +107,7 @@ INSTALLED_APPS = (
     'south',
     'djcelery',
     'mptt',
+    #'jingo',
     'thing',
 )
 
@@ -122,9 +119,15 @@ INSTALLED_APPS = (
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse'
+        }
+    },
     'handlers': {
         'mail_admins': {
             'level': 'ERROR',
+            'filters': ['require_debug_false'],
             'class': 'django.utils.log.AdminEmailHandler'
         }
     },
@@ -145,23 +148,34 @@ SERVER_EMAIL = 'evething@wafflemonster.org'
 # Auth profile thing
 AUTH_PROFILE_MODULE = 'thing.UserProfile'
 
-
 # Themes
 THEMES = [
-    ('theme-default', '<Default>'),
-    ('theme-cyborg.min', 'Cyborg'),
-    ('theme-slate.min', 'Slate'),
+    ('default', '<Default>'),
+    ('darkthing', 'DarkThing *beta*'),
+    ('cerulean', 'Cerulean'),
+    ('cosmo', 'Cosmo'),
+    ('cyborg', 'Cyborg'),
+    ('slate', 'Slate'),
 ]
 
-# Icon themes
-ICON_THEMES = [
-    ('icons-default', '<Default>'),
-    ('icons-fugue-stars', 'Fugue/Stars'),
-]
+# Jingo setup
+JINGO_EXCLUDE_APPS = (
+    'admin',
+    'admindocs',
+    'context_processors',
+)
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.CachedStaticFilesStorage'
 
+# Allow new users to register, provide a default here so if people upgrade
+# without updating local_settings, it won't error
+ALLOW_REGISTRATION = False
+
+# Default stagger APITask calls on startup
+STAGGER_APITASK_STARTUP = True
 
 # load local settings
 from local_settings import *
+MANAGERS = ADMINS
 TEMPLATE_DEBUG = DEBUG
 
 
@@ -172,6 +186,17 @@ djcelery.setup_loader()
 # Rename the default queue
 from kombu import Exchange, Queue
 
+# We're not using rate limits so might as well disable them to save some CPU
+CELERY_DISABLE_RATE_LIMITS = True
+# Set a soft task time limit of 5 minutes
+CELERYD_TASK_SOFT_TIME_LIMIT = 300
+# Set the prefetch multiplier to 1 so super slow tasks aren't breaking everything
+CELERYD_PREFETCH_MULTIPLIER = 1
+# We don't care about the results of tasks
+CELERY_IGNORE_RESULT = True
+# We do care about errors though
+CELERY_STORE_ERRORS_EVEN_IF_IGNORED = True
+# Set up our queues
 CELERY_DEFAULT_QUEUE = 'et_medium'
 CELERY_QUEUES = (
     Queue('et_medium', Exchange('et_medium'), routing_key='et_medium'),
@@ -180,43 +205,58 @@ CELERY_QUEUES = (
 )
 
 # Periodic tasks
+from celery.schedules import crontab
 from datetime import timedelta
+
 CELERYBEAT_SCHEDULE = {
-    # spawn jobs every 30 seconds
-    'spawn-jobs': {
-        'task': 'thing.tasks.spawn_jobs',
-        'schedule': timedelta(seconds=30),
+    # spawn tasks every 30 seconds
+    'task_spawner': {
+        'task': 'thing.task_spawner',
+        'schedule': timedelta(seconds=10),
         'options': {
-            'expires': 25,
+            'expires': 9,
+            'queue': 'et_high',
         },
         'args': (),
     },
 
-    # clean up the API cache every 15 minutes
-    'apicache-cleanup': {
-        'task': 'thing.tasks.apicache_cleanup',
-        'schedule': timedelta(minutes=15),
+    # clean up various table messes every 5 minutes
+    'table_cleaner': {
+        'task': 'thing.table_cleaner',
+        'schedule': timedelta(minutes=5),
+        'options': {
+            'queue': 'et_high',
+        },
         'args': (),
     },
 
     # update history data every 4 hours
-    'history-updater': {
-        'task': 'thing.tasks.history_updater',
+    'history_updater': {
+        'task': 'thing.history_updater',
         'schedule': timedelta(hours=4),
+        'options': {
+            'expires': 239 * 60,
+        },
         'args': (),
     },
 
-    # update price data every 15 minutes
-    'price-updater': {
-        'task': 'thing.tasks.price_updater',
-        'schedule': timedelta(minutes=15),
+    # update price data every 30 minutes
+    'price_updater': {
+        'task': 'thing.price_updater',
+        'schedule': timedelta(minutes=30),
+        'options': {
+            'expires': 29 * 60,
+        },
         'args': (),
     },
 
-    # update conquerable stations every hour
-    'conquerable-stations': {
-        'task': 'thing.tasks.conquerable_stations',
+    # update unknown character/corporation names every hour
+    'fix-names': {
+        'task': 'thing.fix_names',
         'schedule': timedelta(hours=1),
+        'options': {
+            'expires': 59 * 60,
+        },
         'args': (),
     },
 }

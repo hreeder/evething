@@ -1,12 +1,15 @@
 {% extends "base.html" %}
-{% load thing_extras %}
+{% import 'macros/icons.html' as icons %}
 
 {% block title %}Orders{% endblock %}
+
+{% block extra_js %}
+    <script type="text/javascript">$(document).ready(EVEthing.orders.onload);</script>
+{% endblock %}
 
 {% block content %}
       {% if char_orders %}
       <div class="row-fluid">
-        <div class="span1">&nbsp;</div>
         <div class="span8">
           <h2>Character Summary</h2>
           <table class="table table-striped table-bordered table-condensed">
@@ -58,15 +61,14 @@
       {% endif %}
 
       <div class="row-fluid">
-        <div class="span1">&nbsp;</div>
-        <div class="span10">
+        <div class="span12">
           <h2>Active Orders</h2>
           <table class="table table-striped table-bordered table-condensed">
             <thead>
               <tr class="c">
+                <th>Source</th>
                 <th>Station</th>
                 <th>Character</th>
-                <th>Corp</th>
                 <th>Item</th>
                 <th colspan="2">Units</th>
                 <th>Unit Price</th>
@@ -78,10 +80,27 @@
             <tbody>
               {% for order in orders %}
               <tr>
+                <td>
+                  {% if order.corp_wallet -%}
+                  {{ icons.corporation() }}
+                  [<span class="tip" rel="tooltip" title="{{ order.corp_wallet.corporation.name }}">{{ order.corp_wallet.corporation.ticker }}</span>]
+                  {{ order.corp_wallet.description }}
+                  {%- else -%}
+                  {{ icons.player() }}
+                  {{ order.character.name }}
+                  {%- endif %}
+                </td>
                 <td>{{ order.station.short_name }}</td>
-                <td>{{ order.character.name }}</td>
-                <td>{% if order.corp_wallet %}{{ order.corp_wallet.corporation.ticker }}{% endif %}</td>
-                <td><a href="{{ 'transactions-all'|url(order.item.id, 'all') }}">{{ order.item.name }}</a></td>
+                <td>
+                  {% if order.z_creator_character -%}
+                  {{ order.z_creator_character.name }}
+                  {%- else -%}
+                  Unknown ID: {{ order.creator_character_id }}
+                  {%- endif %}
+                </td>
+                <td>
+                  <a href="{{ url('thing.views.transactions') }}?ft=item&fc=eq&fv={{ order.item.name }}">{{ order.item.name }}</a>
+                </td>
                 <td class="r">{{ order.volume_remaining|humanize }}</td>
                 <td class="r">{{ order.volume_entered|humanize }}</td>
                 {% if order.buy_order %}
@@ -96,7 +115,7 @@
               </tr>
               {% else %}
               <tr>
-                <td colspan="9">No orders are currently active.</td>
+                <td colspan="10">No orders are currently active.</td>
               </tr>
               {% endfor %}
             </tbody>
